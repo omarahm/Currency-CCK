@@ -1,0 +1,160 @@
+<?php
+
+/**
+ * @file
+ * Defines a field type for currency.
+ */
+
+/**
+ * Implements hook_help().
+ */
+function currency_cck_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#currency_cck':
+      $output = '';
+      $output .= '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('The Currency module defines a currency field type. Currency values can be formatted in the display into 3 types: Name and Code, Name only or Code only.', array('@field-help' => url('admin/help/field'))) . '</p>';
+
+      return $output;
+  }
+}
+
+/**
+ * Implements hook_field_info().
+ */
+function currency_cck_field_info() {
+  return array(
+    'currency_cck' => array(
+      'label' => 'Currency',
+      'description' => t('Store a currency value in the database.'),
+      'default_widget' => 'currency_cck',
+      'default_formatter' => 'default',
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_validate().
+ *
+ * Possible error codes:
+ * - 'invalid_currency': The currency code can not be found at the currency list provided by currency_api module
+ */
+function currency_cck_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
+
+  $currency_list = currency_api_get_list($field);
+  foreach ($items as $delta => $item) {
+    if ($item['value'] != '') {
+
+      if (!isset($currency_list[$item['value']])) {
+        $errors[$field['field_name']][$langcode][$delta][] = array(
+          'error' => 'invalid_currency',
+          'message' => t('Invalid currency code'),
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_field_is_empty().
+ */
+function currency_cck_field_is_empty($item, $field) {
+  if (empty($item['value'])) {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/**
+ * Implements hook_field_formatter_info().
+ */
+function currency_cck_field_formatter_info() {
+  return array(
+    'default' => array(
+      'label' => t('Name and code'),
+      'field types' => array('currency_cck'),
+    ),
+    'plain' => array(
+      'label' => t('Name only'),
+      'field types' => array('currency_cck'),
+    ),
+    'symbol' => array(
+      'label' => t('Currency symbol'),
+      'field types' => array('currency_cck'),
+    ),
+    'full' => array(
+      'label' => t('Code only'),
+      'field types' => array('currency_cck'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ */
+function currency_cck_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+
+  switch ($display['type']) {
+    case 'default':
+      foreach ($items as $delta => $item) {
+        $currency_desc = currency_api_get_desc($item['value']);
+
+        if ($currency_desc !== FALSE)
+          $element[$delta]['#markup'] = $currency_desc;
+        else
+          drupal_set_message(t('Could not get description for currency code: !value', array('!value' => filter_xss($item['value']))));
+      }
+      break;
+    case 'plain':
+      foreach ($items as $delta => $item) {
+
+        $currency_desc = currency_api_get_desc($item['value']);
+
+        if ($currency_desc !== FALSE) {
+          $currency_desc_pieces = explode('(', $currency_desc);
+          $element[$delta]['#markup'] = $currency_desc_pieces[0];
+        }
+        else
+          drupal_set_message(t('Could not get description for currency code: !value', array('!value' => filter_xss($item['value']))));
+      }
+      break;
+    case 'symbol':
+      foreach ($items as $delta => $item)
+        $element[$delta]['#markup'] = currency_api_get_symbol($item['value']);
+      break;
+    case 'full':
+      foreach ($items as $delta => $item)
+        $element[$delta]['#markup'] = $item['value'];
+      break;
+  }
+  return $element;
+}
+
+/**
+ * Implements hook_field_widget_info().
+ */
+function currency_cck_field_widget_info() {
+  return array(
+    'currency_cck' => array(
+      'label' => t('Select List'),
+      'field types' => array('currency_cck'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_widget_form().
+ */
+function currency_cck_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  $options = currency_api_get_list();
+  $options = array_merge(array('' => '-- Select currency --'), $options);
+
+  $element += array(
+    '#type' => 'select',
+    '#options' => $options,
+    '#default_value' => (isset($items[$delta]['value']) ? $items[$delta]['value'] : '')
+  );
+
+  return array('value' => $element);
+}

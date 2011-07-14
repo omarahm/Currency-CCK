@@ -1,0 +1,7 @@
+name = "Currency CCK"
+description = "Defines a field type for currency."
+dependencies[] = currency_api
+files[] = currency_cck.module
+files[] = currency_cck.install
+package = CCK
+core = 7.x
